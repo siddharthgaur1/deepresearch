@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepresearch-backend
+  labels: { app: deepresearch-backend }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: deepresearch-backend }
+  template:
+    metadata:
+      labels: { app: deepresearch-backend }
+    spec:
+      containers:
+        - name: backend
+          image: deepresearch/backend:latest
+          command: ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          ports: [{ containerPort: 8000 }]
+          envFrom:
+            - secretRef: { name: deepresearch-secrets }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "250m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepresearch-backend
+spec:
+  selector: { app: deepresearch-backend }
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP

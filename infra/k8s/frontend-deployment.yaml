@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepresearch-frontend
+  labels: { app: deepresearch-frontend }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: deepresearch-frontend }
+  template:
+    metadata:
+      labels: { app: deepresearch-frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: deepresearch/frontend:latest
+          ports: [{ containerPort: 3000 }]
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              valueFrom:
+                configMapKeyRef: { name: deepresearch-config, key: api-url }
+          readinessProbe:
+            httpGet: { path: /, port: 3000 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepresearch-frontend
+spec:
+  selector: { app: deepresearch-frontend }
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: LoadBalancer

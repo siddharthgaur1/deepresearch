@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepresearch-worker
+  labels: { app: deepresearch-worker }
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: deepresearch-worker }
+  template:
+    metadata:
+      labels: { app: deepresearch-worker }
+    spec:
+      containers:
+        - name: worker
+          image: deepresearch/worker:latest
+          command: ["celery", "-A", "backend.workers.celery_app", "worker", "--loglevel=info"]
+          envFrom:
+            - secretRef: { name: deepresearch-secrets }
+          volumeMounts:
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+          resources:
+            requests: { cpu: "500m", memory: "512Mi" }
+            limits: { cpu: "2", memory: "2Gi" }
+      volumes:
+        - name: docker-sock
+          hostPath: { path: /var/run/docker.sock }
