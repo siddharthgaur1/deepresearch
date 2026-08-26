@@ -1,0 +1,36 @@
+name: Deploy
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+          docker build -f backend/Dockerfile --target api -t ghcr.io/${{ github.repository }}/backend:${{ github.ref_name }} .
+          docker build -f backend/Dockerfile --target worker -t ghcr.io/${{ github.repository }}/worker:${{ github.ref_name }} .
+          docker build -t ghcr.io/${{ github.repository }}/frontend:${{ github.ref_name }} ./frontend
+          docker push ghcr.io/${{ github.repository }}/backend:${{ github.ref_name }}
+          docker push ghcr.io/${{ github.repository }}/worker:${{ github.ref_name }}
+          docker push ghcr.io/${{ github.repository }}/frontend:${{ github.ref_name }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    # ponytail: no cluster credentials configured here — wire up a
+    # kubeconfig secret + `kubectl set image` (or your GitOps tool) once
+    # there's an actual cluster to deploy to. Manifests already live in infra/k8s.
+    steps:
+      - run: echo "Deploy step is a placeholder until cluster access is configured."

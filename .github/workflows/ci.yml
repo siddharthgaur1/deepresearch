@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r backend/requirements.txt
+      - run: pytest backend/tests/unit --cov=backend --cov-report=term-missing -m "not integration"
+
+  frontend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run lint
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-lint]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f backend/Dockerfile --target api -t deepresearch/backend:ci .
+      - run: docker build -f backend/Dockerfile --target worker -t deepresearch/worker:ci .
+      - run: docker build -t deepresearch/frontend:ci ./frontend
