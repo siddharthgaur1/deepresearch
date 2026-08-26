@@ -1,0 +1,42 @@
+{
+  "title": "DeepResearch",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "id": 1, "title": "Active Jobs", "type": "stat",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "targets": [{"expr": "jobs_active"}]
+    },
+    {
+      "id": 2, "title": "Jobs Submitted (rate)", "type": "timeseries",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "targets": [{"expr": "rate(jobs_total[5m])"}]
+    },
+    {
+      "id": 3, "title": "Job Duration (p95)", "type": "timeseries",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "targets": [{"expr": "histogram_quantile(0.95, rate(job_duration_seconds_bucket[10m]))"}]
+    },
+    {
+      "id": 4, "title": "Agent Calls by Type", "type": "timeseries",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+      "targets": [{"expr": "sum by (agent) (rate(agent_calls_total[5m]))"}]
+    },
+    {
+      "id": 5, "title": "LLM Tokens (in/out)", "type": "timeseries",
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 6},
+      "targets": [{"expr": "sum by (agent, direction) (rate(llm_tokens_total[5m]))"}]
+    },
+    {
+      "id": 6, "title": "LLM Cost (USD/hr)", "type": "timeseries",
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 6},
+      "targets": [{"expr": "sum by (agent) (rate(llm_cost_total[1h]))"}]
+    },
+    {
+      "id": 7, "title": "Celery Queue Depth", "type": "timeseries",
+      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 12},
+      "targets": [{"expr": "worker_queue_depth"}]
+    }
+  ]
+}

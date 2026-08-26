@@ -1,0 +1,30 @@
+# Production overrides: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Local dev's ollama/postgres/rabbitmq stay as-is here (self-hosted = free);
+# swap image tags / add resource limits / secrets as your deployment needs.
+services:
+  backend:
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+    deploy:
+      resources:
+        limits: { cpus: "1", memory: 1g}
+
+  worker:
+    restart: unless-stopped
+    deploy:
+      replicas: 4
+      resources:
+        limits: { cpus: "2", memory: 2g }
+
+  frontend:
+    restart: unless-stopped
+
+  postgres:
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped
+
+  rabbitmq:
+    restart: unless-stopped

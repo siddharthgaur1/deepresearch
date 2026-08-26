@@ -1,0 +1,120 @@
+name: deepresearch
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: deepresearch
+      POSTGRES_PASSWORD: deepresearch
+      POSTGRES_DB: deepresearch
+    ports: ["5433:5432"]  # 5432 remapped: another project on this host already binds it
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deepresearch"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6380:6379"]  # 6379 remapped: another project on this host already binds it
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports: ["5672:5672", "15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes: ["ollama_models:/root/.ollama"]
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: api
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://deepresearch:deepresearch@postgres:5432/deepresearch
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      OLLAMA_BASE_URL: http://ollama:11434
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    command: >
+      sh -c "alembic -c backend/alembic.ini upgrade head &&
+             uvicorn backend.api.main:app --host 0.0.0.0 --port 8000"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: worker
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://deepresearch:deepresearch@postgres:5432/deepresearch
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    deploy:
+      replicas: 2
+    # /var/run/docker.sock lets the worker launch code-executor sandbox containers
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
+
+  flower:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: worker
+    env_file: ../.env
+    environment:
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    command: celery -A backend.workers.celery_app flower --port=5555
+    ports: ["5555:5555"]
+    depends_on: [rabbitmq]
+
+  frontend:
+    build:
+      context: ../frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_KEY: dev-key
+    ports: ["3000:3000"]
+    depends_on: [backend]
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes: ["./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["3001:3000"]
+    volumes: ["./grafana/dashboards:/var/lib/grafana/dashboards:ro"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on: [prometheus]
+
+volumes:
+  pgdata:
+  ollama_models:
