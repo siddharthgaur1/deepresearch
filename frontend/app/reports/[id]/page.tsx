@@ -1,12 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { use } from "react";
 import { getReport } from "@/lib/api";
 import ReportViewer from "@/components/ReportViewer";
 
-export default function ReportPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ReportPage({ params }: { params: { id: string } }) {
+  const { id } = params;
 
   const { data: report, isLoading, error } = useQuery({
     queryKey: ["report", id],
