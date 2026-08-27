@@ -61,6 +61,8 @@ services:
       CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       OLLAMA_BASE_URL: http://ollama:11434
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
+    volumes: ["prom_multiproc:/tmp/prometheus_multiproc"]
     ports: ["127.0.0.1:8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -82,6 +84,7 @@ services:
       CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       OLLAMA_BASE_URL: http://ollama:11434
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -89,7 +92,9 @@ services:
     deploy:
       replicas: 2
     # /var/run/docker.sock lets the worker launch code-executor sandbox containers
-    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - prom_multiproc:/tmp/prometheus_multiproc
 
   flower:
     build:
@@ -125,7 +130,9 @@ services:
   grafana:
     image: grafana/grafana:latest
     ports: ["127.0.0.1:3001:3000"]
-    volumes: ["./grafana/dashboards:/var/lib/grafana/dashboards:ro"]
+    volumes:
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
     depends_on: [prometheus]
@@ -133,3 +140,4 @@ services:
 volumes:
   pgdata:
   ollama_models:
+  prom_multiproc:

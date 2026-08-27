@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.signals import worker_process_shutdown
 
 from backend.core.config import get_settings
 from backend.workers.queues import CELERY_QUEUES
@@ -20,3 +21,14 @@ celery_app.conf.update(
     task_acks_late=True,  # crash mid-run -> task redelivered, checkpoint resumes it
     result_expires=86400,
 )
+
+
+@worker_process_shutdown.connect
+def _cleanup_prometheus_multiproc(pid: int, **kwargs) -> None:
+    # Each prefork child writes its own mmap'd metric file under
+    # PROMETHEUS_MULTIPROC_DIR; without this the file for a dead pid lingers
+    # and gets double-counted if a new process reuses metric names.
+    if settings.prometheus_multiproc_dir:
+        from prometheus_client import multiprocess
+
+        multiprocess.mark_process_dead(pid)

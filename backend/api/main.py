@@ -1,12 +1,13 @@
 import logging
 
 from fastapi import FastAPI
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest, multiprocess
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
 from backend.api.routes import jobs, reports
 from backend.core.config import get_settings
+from backend.services.queue_depth import poll_queue_depth
 
 logging.basicConfig(level=logging.INFO)
 
@@ -34,6 +35,14 @@ app.include_router(jobs.router)
 app.include_router(reports.router)
 
 
+@app.on_event("startup")
+async def _start_queue_depth_poller() -> None:
+    if settings.celery_broker_url.startswith("amqp://"):
+        import asyncio
+
+        asyncio.create_task(poll_queue_depth(settings.celery_broker_url))
+
+
 @app.get("/healthz")
 async def healthz() -> dict:
     return {"status": "ok"}
@@ -41,4 +50,12 @@ async def healthz() -> dict:
 
 @app.get("/metrics")
 async def metrics() -> Response:
+    # Agents run inside separate Celery worker processes, so agent/token/cost
+    # metrics live in per-process mmap files rather than this process's
+    # default registry once PROMETHEUS_MULTIPROC_DIR is set — the collector
+    # below is what merges them back into one scrape.
+    if settings.prometheus_multiproc_dir:
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return Response(generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

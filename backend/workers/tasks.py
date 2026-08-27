@@ -15,11 +15,13 @@ which is I/O-heavy) ever needs to scale independently of the rest.
 import asyncio
 import json
 import logging
+import time
 import uuid
 
 from sqlalchemy import select
 
 from backend.core.database import async_session_factory
+from backend.core.metrics import job_duration_seconds, jobs_active
 from backend.core.redis import get_redis, job_channel
 from backend.graph.checkpointer import get_checkpointer
 from backend.graph.graph import build_graph
@@ -65,16 +67,22 @@ async def _run_research_job_async(job_id: str, query: str) -> str:
     await publish("status_changed", "planning")
     await _persist_status(job_id, ResearchStatus.PLANNING)
 
-    async with get_checkpointer() as checkpointer:
-        graph = build_graph(checkpointer=checkpointer)
-        config = {"configurable": {"thread_id": job_id}}
-        try:
-            final_state = await graph.ainvoke(initial_state, config=config)
-        except Exception as exc:
-            logger.exception("job_failed", extra={"job_id": job_id})
-            await publish("error", str(exc))
-            await _persist_failure(job_id, str(exc))
-            raise
+    jobs_active.inc()
+    started_at = time.monotonic()
+    try:
+        async with get_checkpointer() as checkpointer:
+            graph = build_graph(checkpointer=checkpointer)
+            config = {"configurable": {"thread_id": job_id}}
+            try:
+                final_state = await graph.ainvoke(initial_state, config=config)
+            except Exception as exc:
+                logger.exception("job_failed", extra={"job_id": job_id})
+                await publish("error", str(exc))
+                await _persist_failure(job_id, str(exc))
+                raise
+    finally:
+        jobs_active.dec()
+        job_duration_seconds.observe(time.monotonic() - started_at)
 
     await _persist_result(job_id, final_state)
     await publish("status_changed", str(final_state.get("status")))
