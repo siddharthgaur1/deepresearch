@@ -24,6 +24,7 @@ playwright==1.47.0
 
 markdown==3.7
 weasyprint==62.3
+pydyf==0.11.0  # weasyprint 62.3 needs pydyf<0.12; unpinned resolves to 0.12+ which drops Stream.transform()
 
 prometheus-client==0.20.0
 flower==2.0.1
