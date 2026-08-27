@@ -22,6 +22,10 @@ running end to end on your own machine for $0, no paid API required.
 |---|---|---|
 | ![Home](docs/screenshots/01-home.png) | ![Job feed](docs/screenshots/03-job-feed.png) | ![Report](docs/screenshots/04-report.png) |
 
+| Celery tasks (Flower) | Metrics (Grafana) |
+|---|---|
+| ![Flower](docs/screenshots/05-flower.png) | ![Grafana](docs/screenshots/06-grafana.png) |
+
 ## Architecture
 
 ```mermaid
