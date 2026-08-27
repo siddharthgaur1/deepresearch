@@ -9,13 +9,17 @@ Findings: {summary}
 Available citation numbers for this section's sources: {citation_numbers}
 
 Write 2-4 paragraphs of prose. Do not repeat the sub-question as a heading, \
-the heading is added separately.
+the heading is added separately. If the list of available citation numbers \
+is empty, do not write any [n] markers — there are no sources to cite. \
+Output only the prose paragraphs. No preamble, no "Sure", no sign-off.
 """
 
 EXEC_SUMMARY_PROMPT = """Write a 3-5 sentence executive summary of this research \
 report for the query "{query}", based on these section summaries:
 
 {sections}
+
+Output only the summary sentences. No preamble, no "Certainly", no sign-off.
 """
 
 
@@ -88,6 +92,23 @@ def _render_markdown(
     state: ResearchState, exec_summary: str, sections: dict[str, str], citations: list[Citation]
 ) -> str:
     lines = [f"# Research Report: {state['query']}", "", "## Executive Summary", exec_summary, ""]
+
+    if not citations:
+        lines += [
+            "> **Warning: no sources were retrieved for this report.** "
+            "Search returned no results (rate-limited or unavailable), so the "
+            "findings below are not grounded in any external source and should "
+            "be treated as unverified.",
+            "",
+        ]
+
+    if state.get("error"):
+        lines += [
+            f"> **Warning: an agent failed mid-run ({state['error']}).** "
+            "This report may be based on incomplete research or unverified "
+            "claims — the run did not fully complete as designed.",
+            "",
+        ]
 
     lines.append("## Findings")
     for sq in state["sub_questions"]:

@@ -44,10 +44,14 @@ class FactCheckerAgent(BaseAgent):
             total_cost += result.cost_usd
 
             verdict = result.content.strip().upper()
+            # CONTRADICTED must not collapse into the same "unverified" bucket
+            # as a garbled/unparseable verdict: evidence actively disagreeing
+            # with a claim is a stronger, distinct signal than "couldn't tell".
             confidence = {
                 "SUPPORTED": "high",
                 "PARTIAL": "medium",
-            }.get(verdict, "unverified" if verdict != "CONTRADICTED" else "unverified")
+                "CONTRADICTED": "contradicted",
+            }.get(verdict, "unverified")
             verified.append({**claim, "confidence": confidence})
 
         return {

@@ -9,7 +9,12 @@ class Settings(BaseSettings):
 
     # App
     app_name: str = "DeepResearch"
-    api_key: str = Field(default="dev-key", description="Static API key for REST auth")
+    # No code-level default on purpose: a hardcoded fallback here (even a
+    # dev-only-looking one) is a credential baked into public source, so a
+    # deployment that forgets to set API_KEY is "protected" by a string
+    # anyone can read on GitHub. .env.example already sets API_KEY=dev-key
+    # for local dev, so this changes nothing for the documented quickstart.
+    api_key: str = Field(description="Static API key for REST auth — must be set via .env")
     environment: str = "development"
 
     # Database

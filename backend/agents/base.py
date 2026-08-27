@@ -33,9 +33,15 @@ class BaseAgent(ABC):
         logger.info("agent_started", extra={"agent": self.name, "job_id": state["job_id"]})
         try:
             update = await self.run(state)
-        except Exception as exc:  # agents must not crash the graph run
+        except Exception:  # agents must not crash the graph run
+            # Full exception (which can embed prompt/query content, or a
+            # provider error echoing request details) goes to server logs
+            # only. The generic message below is what reaches the DB, the
+            # SSE feed, and — since a failure here is now surfaced in the
+            # final report (backend/agents/writer.py) — the report itself,
+            # so nothing sensitive flows into a user-facing artifact.
             logger.exception("agent_failed", extra={"agent": self.name, "job_id": state["job_id"]})
-            return {"error": f"{self.name}: {exc}"}
+            return {"error": f"{self.name} failed — see server logs for details"}
 
         duration = time.monotonic() - start
         call_meta: AgentCallMetadata = {

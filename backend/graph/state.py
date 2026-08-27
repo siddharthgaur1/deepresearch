@@ -36,7 +36,7 @@ class Claim(TypedDict):
     text: str
     sub_question_id: str
     source_urls: list[str]
-    confidence: str  # high | medium | low | unverified
+    confidence: str  # high | medium | low | contradicted | unverified
 
 
 class Citation(TypedDict):

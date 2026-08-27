@@ -11,11 +11,21 @@ from backend.core.config import get_settings
 logging.basicConfig(level=logging.INFO)
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name)
+_is_dev = settings.environment == "development"
+app = FastAPI(
+    title=settings.app_name,
+    # Swagger/ReDoc/the raw OpenAPI schema expose every endpoint's request
+    # and response shape with no auth of their own (they're FastAPI's own
+    # routes, not under jobs.router's require_api_key dependency) -- fine
+    # for local dev, real disclosure surface anywhere else.
+    docs_url="/docs" if _is_dev else None,
+    redoc_url="/redoc" if _is_dev else None,
+    openapi_url="/openapi.json" if _is_dev else None,
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.environment == "development" else [],
+    allow_origins=["*"] if _is_dev else [],
     allow_methods=["*"],
     allow_headers=["*"],
 )

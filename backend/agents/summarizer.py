@@ -11,8 +11,10 @@ Sources:
 {sources}
 
 Write a concise structured summary (3-6 sentences), then list the distinct \
-factual claims it supports. Respond as JSON:
-{{"summary": "...", "claims": ["claim 1", "claim 2"]}}
+factual claims it supports. For each claim, name which of the source URLs \
+above actually support it — not every source in this batch, only the ones \
+that specifically back that claim. Respond as JSON:
+{{"summary": "...", "claims": [{{"text": "claim text", "source_urls": ["url1", "url2"]}}]}}
 """
 
 
@@ -34,22 +36,41 @@ class SummarizerAgent(BaseAgent):
         try:
             parsed = json.loads(result.content)
             summary = str(parsed.get("summary", ""))
-            claim_texts = [str(c) for c in parsed.get("claims", [])]
+            raw_claims = parsed.get("claims", [])
         except Exception:
             summary = result.content
-            claim_texts = []
+            raw_claims = []
 
-        source_urls = [r["url"] for r in results]
-        claims: list[Claim] = [
-            Claim(
-                id=str(uuid.uuid4()),
-                text=text,
-                sub_question_id=sub_question["id"],
-                source_urls=source_urls,
-                confidence="unverified",
+        # Per-claim source_urls must come from the model, not from blanket-
+        # attaching every source in the batch to every claim: that would let
+        # a single-source claim silently pass fact_checker's "supported by
+        # >=2 independent sources" gate just because the sub-question had 2+
+        # search results overall, regardless of which of them actually back
+        # that specific claim. Only fall back to the old blanket behavior
+        # for a claim the model returned as a bare string (schema not
+        # followed — small local models sometimes ignore it), since at that
+        # point there's no per-claim attribution to recover.
+        all_urls = [r["url"] for r in results]
+        valid_urls = {r["url"] for r in results}
+        claims: list[Claim] = []
+        for c in raw_claims:
+            if isinstance(c, dict):
+                text = str(c.get("text", "")).strip()
+                source_urls = [u for u in c.get("source_urls", []) if u in valid_urls]
+            else:
+                text = str(c).strip()
+                source_urls = all_urls
+            if not text:
+                continue
+            claims.append(
+                Claim(
+                    id=str(uuid.uuid4()),
+                    text=text,
+                    sub_question_id=sub_question["id"],
+                    source_urls=source_urls,
+                    confidence="unverified",
+                )
             )
-            for text in claim_texts
-        ]
 
         return {
             "summaries": {sub_question["id"]: summary},

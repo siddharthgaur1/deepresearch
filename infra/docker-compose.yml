@@ -1,3 +1,11 @@
+# Every `ports:` entry below binds to 127.0.0.1 explicitly, not the bare
+# host-port form (which Docker binds to 0.0.0.0 by default) — this stack is
+# designed as a self-hosted, single-user local deployment (see README), and
+# several of these services have no auth of their own (Flower) or ship
+# with default/weak credentials (Postgres, RabbitMQ, Grafana). Binding to
+# loopback only means none of that is reachable from the network even if a
+# credential is never rotated. Deploying on a shared host or exposing any
+# of this beyond localhost needs its own reverse proxy + auth in front.
 name: deepresearch
 
 services:
@@ -5,9 +13,9 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: deepresearch
-      POSTGRES_PASSWORD: deepresearch
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-deepresearch}
       POSTGRES_DB: deepresearch
-    ports: ["5433:5432"]  # 5432 remapped: another project on this host already binds it
+    ports: ["127.0.0.1:5433:5432"]  # 5432 remapped: another project on this host already binds it
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U deepresearch"]
@@ -17,7 +25,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports: ["6380:6379"]  # 6379 remapped: another project on this host already binds it
+    ports: ["127.0.0.1:6380:6379"]  # 6379 remapped: another project on this host already binds it
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -26,7 +34,10 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    ports: ["5672:5672", "15672:15672"]
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports: ["127.0.0.1:5672:5672", "127.0.0.1:15672:15672"]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -35,7 +46,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    ports: ["11434:11434"]
+    ports: ["127.0.0.1:11435:11434"]  # 11434 remapped: a native Ollama install on the host already binds it
     volumes: ["ollama_models:/root/.ollama"]
 
   backend:
@@ -45,12 +56,12 @@ services:
       target: api
     env_file: ../.env
     environment:
-      DATABASE_URL: postgresql+asyncpg://deepresearch:deepresearch@postgres:5432/deepresearch
+      DATABASE_URL: postgresql+asyncpg://deepresearch:${POSTGRES_PASSWORD:-deepresearch}@postgres:5432/deepresearch
       REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       OLLAMA_BASE_URL: http://ollama:11434
-    ports: ["8000:8000"]
+    ports: ["127.0.0.1:8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -66,9 +77,9 @@ services:
       target: worker
     env_file: ../.env
     environment:
-      DATABASE_URL: postgresql+asyncpg://deepresearch:deepresearch@postgres:5432/deepresearch
+      DATABASE_URL: postgresql+asyncpg://deepresearch:${POSTGRES_PASSWORD:-deepresearch}@postgres:5432/deepresearch
       REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       OLLAMA_BASE_URL: http://ollama:11434
     depends_on:
@@ -87,10 +98,14 @@ services:
       target: worker
     env_file: ../.env
     environment:
-      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-    command: celery -A backend.workers.celery_app flower --port=5555
-    ports: ["5555:5555"]
+      # Flower ships with no auth of its own; --basic_auth is the minimum bar
+      # before this is ever reachable from anywhere but loopback (see the
+      # 127.0.0.1 binding below, which is the actual primary control here).
+      FLOWER_BASIC_AUTH: ${FLOWER_BASIC_AUTH:-admin:admin}
+    command: celery -A backend.workers.celery_app flower --port=5555 --basic_auth=${FLOWER_BASIC_AUTH:-admin:admin}
+    ports: ["127.0.0.1:5555:5555"]
     depends_on: [rabbitmq]
 
   frontend:
@@ -98,21 +113,21 @@ services:
       context: ../frontend
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
-      NEXT_PUBLIC_API_KEY: dev-key
-    ports: ["3000:3000"]
+      NEXT_PUBLIC_API_KEY: ${API_KEY:-dev-key}
+    ports: ["127.0.0.1:3000:3000"]
     depends_on: [backend]
 
   prometheus:
     image: prom/prometheus:latest
     volumes: ["./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
-    ports: ["9090:9090"]
+    ports: ["127.0.0.1:9090:9090"]
 
   grafana:
     image: grafana/grafana:latest
-    ports: ["3001:3000"]
+    ports: ["127.0.0.1:3001:3000"]
     volumes: ["./grafana/dashboards:/var/lib/grafana/dashboards:ro"]
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
     depends_on: [prometheus]
 
 volumes:
