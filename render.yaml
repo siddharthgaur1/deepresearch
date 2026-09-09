@@ -1,0 +1,55 @@
+services:
+  - type: web
+    name: deepresearch-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /healthz
+    target: combo
+    envVars:
+      - key: API_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_SYNC
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+      - key: LLM_MODEL
+        value: groq/llama-3.1-8b-instant
+      - key: GROQ_API_KEY
+        sync: false
+      - key: EMBEDDING_MODEL
+        value: openai/text-embedding-3-small
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: EMBEDDING_DIMS
+        value: "1536"
+      - key: SEARCH_PROVIDER
+        value: duckduckgo
+      - key: ENVIRONMENT
+        value: production
+
+  - type: web
+    name: deepresearch-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: deepresearch-api
+          property: hostport
+      - key: NEXT_PUBLIC_API_KEY
+        fromService:
+          type: web
+          name: deepresearch-api
+          property: envVarKey
+          envVarKey: API_KEY

@@ -67,6 +67,14 @@ flowchart TB
 | Writer | Assembles the final cited markdown report |
 | Citation Validator | Checks every cited URL is actually reachable |
 
+## Deploying a public demo for free
+
+`render.yaml` + `docs/DEPLOY_FREE.md` deploy this on Render's free tier,
+swapping only the pieces a free tier genuinely can't run (local Ollama,
+self-hosted Postgres/Redis/RabbitMQ) for free managed equivalents — no
+application code changes. See `docs/DEPLOY_FREE.md` for the ~15-minute setup
+and its known limitations on a free instance.
+
 ## Quickstart
 
 ```bash
