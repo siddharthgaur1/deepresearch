@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest, multiprocess
@@ -13,7 +15,23 @@ logging.basicConfig(level=logging.INFO)
 
 settings = get_settings()
 _is_dev = settings.environment == "development"
+
+_background_tasks: set[asyncio.Task] = set()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if settings.celery_broker_url.startswith("amqp://"):
+        # Held in a module-level set: asyncio only keeps a weak reference to a
+        # running task, so a bare create_task() can be collected mid-flight.
+        task = asyncio.create_task(poll_queue_depth(settings.celery_broker_url))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title=settings.app_name,
     # Swagger/ReDoc/the raw OpenAPI schema expose every endpoint's request
     # and response shape with no auth of their own (they're FastAPI's own
@@ -34,13 +52,6 @@ app.add_middleware(
 app.include_router(jobs.router)
 app.include_router(reports.router)
 
-
-@app.on_event("startup")
-async def _start_queue_depth_poller() -> None:
-    if settings.celery_broker_url.startswith("amqp://"):
-        import asyncio
-
-        asyncio.create_task(poll_queue_depth(settings.celery_broker_url))
 
 
 @app.get("/healthz")
