@@ -1,5 +1,6 @@
 # DeepResearch
 
+[![CI](https://github.com/siddharthgaur1/deepresearch/actions/workflows/ci.yml/badge.svg)](https://github.com/siddharthgaur1/deepresearch/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.2-1C3C3C)
