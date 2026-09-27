@@ -1,13 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { cancelJob, getJobStatus } from "@/lib/api";
 import AgentFeed from "@/components/AgentFeed";
 import ProgressBar from "@/components/ProgressBar";
 
-export default function JobPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default function JobPage() {
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
   const { data: job } = useQuery({

@@ -1,7 +1,9 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+# The lockfile is what `npm audit` and CI check; `npm install` from
+# package.json alone would resolve a different, unaudited tree.
+COPY package.json package-lock.json ./
+RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
