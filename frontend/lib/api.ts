@@ -54,12 +54,31 @@ export async function cancelJob(jobId: string): Promise<JobStatus> {
   return res.json();
 }
 
+export async function getStreamToken(jobId: string): Promise<string> {
+  const res = await fetch(`${API_URL}/jobs/${jobId}/stream-token`, { method: "POST", headers: headers() });
+  if (!res.ok) throw new Error(`Failed to fetch stream token: ${res.status}`);
+  return (await res.json()).token;
+}
+
 export async function getReport(jobId: string): Promise<Report> {
   const res = await fetch(`${API_URL}/reports/${jobId}`, { headers: headers() });
   if (!res.ok) throw new Error(`Failed to fetch report: ${res.status}`);
   return res.json();
 }
 
-export function reportPdfUrl(jobId: string): string {
-  return `${API_URL}/reports/${jobId}/pdf`;
+// A plain <a href> to /pdf can't send the x-api-key header, so fetch it and
+// hand the browser the bytes instead.
+export async function getReportPdf(jobId: string): Promise<Blob> {
+  const res = await fetch(`${API_URL}/reports/${jobId}/pdf`, { headers: headers() });
+  if (!res.ok) throw new Error(`Failed to fetch PDF: ${res.status}`);
+  return res.blob();
+}
+
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url)); // after the click's download has started
 }

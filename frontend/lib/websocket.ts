@@ -3,6 +3,8 @@
 // (backend/services/streaming.py) — one-directional server->client, no need
 // for a full WebSocket round trip.
 
+import { getStreamToken } from "./api";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export interface JobEvent {
@@ -13,15 +15,39 @@ export interface JobEvent {
 }
 
 export function subscribeToJobEvents(jobId: string, onEvent: (event: JobEvent) => void): () => void {
-  const source = new EventSource(`${API_URL}/jobs/${jobId}/events`);
+  let source: EventSource | null = null;
+  let closed = false;
 
-  source.onmessage = (msg) => {
+  // EventSource can't send the x-api-key header, so trade it for a
+  // short-lived job-scoped token first. The token is only checked when the
+  // stream opens, so on a dropped connection we fetch a fresh one instead of
+  // letting EventSource retry with an expired token.
+  const connect = async () => {
+    let token: string;
     try {
-      onEvent(JSON.parse(msg.data) as JobEvent);
+      token = await getStreamToken(jobId);
     } catch {
-      // ignore malformed frames rather than tearing down the stream
+      return; // the job page's status polling still tracks progress
     }
+    if (closed) return;
+    source = new EventSource(`${API_URL}/jobs/${jobId}/events?token=${encodeURIComponent(token)}`);
+    source.onmessage = (msg) => {
+      try {
+        onEvent(JSON.parse(msg.data) as JobEvent);
+      } catch {
+        // ignore malformed frames rather than tearing down the stream
+      }
+    };
+    source.onerror = () => {
+      source?.close();
+      if (!closed) setTimeout(connect, 2000);
+    };
   };
 
-  return () => source.close();
+  connect();
+
+  return () => {
+    closed = true;
+    source?.close();
+  };
 }
