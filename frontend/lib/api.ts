@@ -66,6 +66,19 @@ export async function getReport(jobId: string): Promise<Report> {
   return res.json();
 }
 
-export function reportPdfUrl(jobId: string): string {
-  return `${API_URL}/reports/${jobId}/pdf`;
+// A plain <a href> to /pdf can't send the x-api-key header, so fetch it and
+// hand the browser the bytes instead.
+export async function getReportPdf(jobId: string): Promise<Blob> {
+  const res = await fetch(`${API_URL}/reports/${jobId}/pdf`, { headers: headers() });
+  if (!res.ok) throw new Error(`Failed to fetch PDF: ${res.status}`);
+  return res.blob();
+}
+
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url)); // after the click's download has started
 }
