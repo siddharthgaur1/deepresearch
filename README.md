@@ -227,8 +227,9 @@ pytest tests/integration -m integration  # needs docker compose up -d
 ```
 
 The integration suite is flaky on Windows specifically: pytest-asyncio gives
-each test function its own event loop, but `get_db()`/`get_redis()` cache
-their async clients process-wide (`@lru_cache`), so a client created in one
+each test function its own event loop, but the async clients live
+process-wide (`get_redis()` is `@lru_cache`d; `get_db()`'s engine is created
+at import in `backend/core/database.py`), so a client created in one
 test's loop can outlive it and break in the next. Doesn't affect the
 Docker-hosted stack (Linux containers, one event loop for the app's whole
 lifetime) — only host-side `pytest` runs on Windows.
