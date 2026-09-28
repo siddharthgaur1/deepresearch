@@ -9,7 +9,15 @@ import SourceCard from "./SourceCard";
 export default function ReportViewer({ report }: { report: Report }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() =>
+            downloadBlob(new Blob([report.markdown], { type: "text/markdown" }), `report-${report.job_id}.md`)
+          }
+          className="text-sm rounded-md border border-neutral-700 px-3 py-1.5 hover:bg-neutral-800"
+        >
+          Download .md
+        </button>
         <button
           onClick={async () => downloadBlob(await getReportPdf(report.job_id), `report-${report.job_id}.pdf`)}
           className="text-sm rounded-md border border-neutral-700 px-3 py-1.5 hover:bg-neutral-800"
