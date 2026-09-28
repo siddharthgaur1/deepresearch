@@ -50,6 +50,7 @@ app.add_middleware(
 )
 
 app.include_router(jobs.router)
+app.include_router(jobs.events_router)
 app.include_router(reports.router)
 
 

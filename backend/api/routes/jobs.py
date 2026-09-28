@@ -1,10 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
-from backend.api.routes.auth import require_api_key
+from backend.api.routes.auth import create_stream_token, require_api_key, verify_stream_token
 from backend.core.database import get_db
 from backend.core.redis import get_redis, rate_limit_key
 from backend.core.config import get_settings
@@ -13,6 +13,9 @@ from backend.services import job_service
 from backend.services.streaming import stream_job_events
 
 router = APIRouter(prefix="/jobs", tags=["jobs"], dependencies=[Depends(require_api_key)])
+# The SSE route lives outside `router` because EventSource can't send the
+# x-api-key header; it authenticates with a token from /stream-token instead.
+events_router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.post("", response_model=JobCreateResponse, status_code=202)
@@ -60,8 +63,15 @@ async def cancel_job(job_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> J
     )
 
 
-@router.get("/{job_id}/events")
-async def job_events(job_id: uuid.UUID) -> StreamingResponse:
+@router.post("/{job_id}/stream-token")
+async def job_stream_token(job_id: uuid.UUID) -> dict:
+    return {"token": create_stream_token(str(job_id))}
+
+
+@events_router.get("/{job_id}/events")
+async def job_events(job_id: uuid.UUID, token: str = Query(...)) -> StreamingResponse:
+    if not verify_stream_token(str(job_id), token):
+        raise HTTPException(status_code=401, detail="Invalid or expired stream token")
     return StreamingResponse(stream_job_events(str(job_id)), media_type="text/event-stream")
 
 

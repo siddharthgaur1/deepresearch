@@ -54,6 +54,12 @@ export async function cancelJob(jobId: string): Promise<JobStatus> {
   return res.json();
 }
 
+export async function getStreamToken(jobId: string): Promise<string> {
+  const res = await fetch(`${API_URL}/jobs/${jobId}/stream-token`, { method: "POST", headers: headers() });
+  if (!res.ok) throw new Error(`Failed to fetch stream token: ${res.status}`);
+  return (await res.json()).token;
+}
+
 export async function getReport(jobId: string): Promise<Report> {
   const res = await fetch(`${API_URL}/reports/${jobId}`, { headers: headers() });
   if (!res.ok) throw new Error(`Failed to fetch report: ${res.status}`);
