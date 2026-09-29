@@ -25,6 +25,9 @@ CMD uvicorn backend.api.main:app --host 0.0.0.0 --port ${PORT:-8000}
 
 FROM base AS worker
 RUN playwright install --with-deps chromium
+# Docker CLI only (no daemon) — code_sandbox.py shells out to `docker run`
+# against the host daemon via the mounted /var/run/docker.sock.
+COPY --from=docker:29-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY backend/ ./backend/
 CMD ["celery", "-A", "backend.workers.celery_app", "worker", "--loglevel=info"]
 

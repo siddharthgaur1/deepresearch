@@ -130,9 +130,15 @@ exactly the kind of bug that only shows up once you actually load the page
 in a browser instead of only curling the API.
 
 **Docker socket mount for the Code Executor sandbox, not `subprocess`.**
-Sandboxed Python execution runs as `docker run --network none --memory 512m`
-against the host daemon (`backend/tools/code_sandbox.py`), so a crashed or
-hostile script can't touch the worker process or the network. gVisor
+Sandboxed Python execution runs as `docker run -i --network none --memory 512m
+--pids-limit 64 python:3.11-slim python -` against the host daemon
+(`backend/tools/code_sandbox.py`), so a crashed or hostile script can't
+touch the worker process or the network. The script goes in on stdin, not
+through a bind mount: the daemon is the *host's*, so a `-v` path would be
+resolved on the host, where the worker's temp dir doesn't exist. The worker
+image carries only the Docker CLI (copied from `docker:29-cli`), no daemon.
+CI builds that image, but nothing here runs the sandbox end to end against a
+real daemon — treat it as untested until you've run a job that needs it. gVisor
 (`--runtime=runsc`) is a config flag away for stronger isolation in
 production; the default runtime is enough for a self-hosted single-user
 deployment.
