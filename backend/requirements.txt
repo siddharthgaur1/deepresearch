@@ -17,7 +17,7 @@ psycopg[binary]==3.2.2
 alembic==1.13.2
 pgvector==0.3.4
 
-litellm==1.100.0
+litellm==1.100.4
 duckduckgo-search==6.2.13
 httpx==0.28.1
 playwright==1.47.0
