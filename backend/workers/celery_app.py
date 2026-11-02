@@ -19,6 +19,9 @@ celery_app.conf.update(
     task_track_started=True,
     worker_prefetch_multiplier=1,  # long-running graph tasks: don't hoard work
     task_acks_late=True,  # crash mid-run -> task redelivered, checkpoint resumes it
+    # acks_late alone still acks when the child process is killed, so the job would be lost.
+    # ponytail: a job that kills its worker every time loops; add a delivery limit if that happens.
+    task_reject_on_worker_lost=True,
     result_expires=86400,
 )
 
