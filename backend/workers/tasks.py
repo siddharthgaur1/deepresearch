@@ -25,6 +25,7 @@ from backend.core.metrics import job_duration_seconds, jobs_active
 from backend.core.redis import get_redis, job_channel
 from backend.graph.checkpointer import get_checkpointer
 from backend.graph.graph import build_graph
+from backend.graph.resume import run_or_resume
 from backend.graph.state import ResearchStatus
 from backend.models.job import Job
 from backend.models.report import Report
@@ -74,7 +75,7 @@ async def _run_research_job_async(job_id: str, query: str) -> str:
             graph = build_graph(checkpointer=checkpointer)
             config = {"configurable": {"thread_id": job_id}}
             try:
-                final_state = await graph.ainvoke(initial_state, config=config)
+                final_state = await run_or_resume(graph, initial_state, config)
             except Exception as exc:
                 logger.exception("job_failed", extra={"job_id": job_id})
                 await publish("error", str(exc))

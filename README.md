@@ -99,7 +99,8 @@ Sub-question research needs to happen in parallel but still resume cleanly
 if a worker dies mid-job. Hand-rolling that with `asyncio.gather` means also
 hand-rolling checkpointing; `Send()` gets parallel fan-out *and* per-node
 Postgres checkpointing (`PostgresSaver`) for free, so a worker crash resumes
-the job on another replica instead of losing it.
+the job from its last completed node on another replica instead of losing it
+(`backend/graph/resume.py`, tested in `backend/tests/unit/test_resume.py`).
 
 **Celery + RabbitMQ instead of driving the graph straight off FastAPI
 background tasks.** A single research job can run for minutes and make
@@ -239,5 +240,9 @@ lifetime) — only host-side `pytest` runs on Windows.
   occasionally write informally even with prompt constraints — a capability
   ceiling of small local models, not a code bug. Swap `LLM_MODEL` for a
   paid provider if you need consistently polished prose.
+- **Crash recovery is tested on the real graph with stubbed agents and an
+  in-memory checkpointer**, not by killing a worker against live RabbitMQ and
+  Postgres. A job that kills its worker every time will be redelivered in a
+  loop: there is no delivery limit yet.
 - **k8s manifests** (`infra/k8s/`) are structurally complete but only the
   Docker Compose path has been exercised against a live stack so far.
