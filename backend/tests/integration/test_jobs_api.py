@@ -38,10 +38,11 @@ async def test_submit_job_rejects_bad_api_key():
 
 
 @pytest.mark.asyncio
-async def test_job_events_authenticates_via_query_param_not_header():
+async def test_job_events_authenticates_via_stream_token_not_header():
     """EventSource (the browser's SSE client) can't set request headers, so
-    /events must accept the key as a query param — regression test for the
-    422 that made the live agent-activity feed silently never populate."""
+    /events takes a short-lived job-scoped token from /stream-token instead --
+    regression test for the 422 that made the live agent-activity feed
+    silently never populate."""
     settings = get_settings()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -53,7 +54,8 @@ async def test_job_events_authenticates_via_query_param_not_header():
         rejected = await client.get(f"/jobs/{job_id}/events")
         assert rejected.status_code == 422
 
-        async with client.stream(
-            "GET", f"/jobs/{job_id}/events", params={"api_key": settings.api_key}
-        ) as resp:
+        token = (
+            await client.post(f"/jobs/{job_id}/stream-token", headers={"x-api-key": settings.api_key})
+        ).json()["token"]
+        async with client.stream("GET", f"/jobs/{job_id}/events", params={"token": token}) as resp:
             assert resp.status_code == 200

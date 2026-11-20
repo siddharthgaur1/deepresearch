@@ -123,9 +123,12 @@ verified — degrading visibly beats degrading silently.
 **SSE over WebSockets for the live agent feed.** The feed is one-directional
 (server → browser); a full WebSocket round trip buys nothing here that
 `EventSource` + Redis pub/sub doesn't already give more simply. The one real
-gotcha: `EventSource` can't set custom headers, so `/jobs/{id}/events`
-authenticates via a query param instead of the `x-api-key` header the rest
-of the API uses (`backend/api/routes/auth.py`) — easy to miss, and it's
+gotcha: `EventSource` can't set custom headers, so `/jobs/{id}/events` can't
+use the `x-api-key` header the rest of the API uses. The client first calls
+`POST /jobs/{id}/stream-token` (with the header) and opens the stream with
+`?token=` — a 60-second HMAC token signed with `API_KEY` and scoped to that
+one job (`backend/api/routes/auth.py`), so the long-lived API key never
+lands in a URL, access log, or browser history. Easy to miss, and it's
 exactly the kind of bug that only shows up once you actually load the page
 in a browser instead of only curling the API.
 
@@ -224,8 +227,9 @@ pytest tests/integration -m integration  # needs docker compose up -d
 ```
 
 The integration suite is flaky on Windows specifically: pytest-asyncio gives
-each test function its own event loop, but `get_db()`/`get_redis()` cache
-their async clients process-wide (`@lru_cache`), so a client created in one
+each test function its own event loop, but the async clients live
+process-wide (`get_redis()` is `@lru_cache`d; `get_db()`'s engine is created
+at import in `backend/core/database.py`), so a client created in one
 test's loop can outlive it and break in the next. Doesn't affect the
 Docker-hosted stack (Linux containers, one event loop for the app's whole
 lifetime) — only host-side `pytest` runs on Windows.
